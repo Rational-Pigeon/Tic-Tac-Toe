@@ -5,6 +5,7 @@
 //  -turn : boolean - true is O and false is X
 //  -round : int
 //  -turn_counter : int
+//  -isGameOver : boolean
 //  -getPlayerInput() - one of: int[0-8] or getPlayerInput() interp.:
 //   returns a int[0-8] after checking with board for validity
 //  +playTurn() : null - plays one full turn
@@ -15,8 +16,11 @@ function Game(player1, player2) {
     this.turn = true;
     this.round = 1;
     this.turn_counter = 0;
+    this.isGameOver = false;
 
     this.playTurn = (index) => {
+        if (this.isGameOver) return;
+
         if (Gameboard.isEmpty(index)) {
             Gameboard.updateBoard(this.turn, index);
             displayController.updateBoard(index, this.turn ? "O" : "X");
@@ -34,10 +38,12 @@ function Game(player1, player2) {
     };
 
     this.gameOver = function(hasWinner) {
+        this.isGameOver = true;
         if (hasWinner) {
             const winner = this.turn ? player1 : player2;
             winner.incrementScore();
             displayController.updateMessage(`${winner.getName()} wins!`);
+            displayController.updateScores(player1.getScore(), player2.getScore());
         } else {
             displayController.updateMessage("It's a tie!");
         }
@@ -49,8 +55,11 @@ function Game(player1, player2) {
         this.turn = true;
         this.turn_counter = 0;
         this.round++;
+        this.isGameOver = false;
         displayController.resetBoard();
         displayController.updateMessage(`${player1.getName()}'s turn`);
+        // Update round display
+        displayController.updateRound(this.round);
     };
 }
 
@@ -141,10 +150,15 @@ function Player(name) {
 //  +updateMessage(message:string) : null
 //  +resetBoard() : null
 //  +disableBoard() : null
+//  +updateScores(player1Score:int, player2Score:int) : null
+//  +updateRound(round:int) : null - updates the displayed round number
 const displayController = (function() {
     const cells = document.querySelectorAll('.cell');
     const messageDiv = document.getElementById('message');
     const restartButton = document.getElementById('restart');
+    const player1ScoreSpan = document.getElementById('player1Score');
+    const player2ScoreSpan = document.getElementById('player2Score');
+    const roundSpan = document.getElementById('round');
 
     cells.forEach(cell => {
         cell.addEventListener('click', (e) => {
@@ -181,11 +195,23 @@ const displayController = (function() {
         });
     }
 
+    // New methods for updating scores and round
+    const updateScores = (player1Score, player2Score) => {
+        player1ScoreSpan.textContent = `Player 1 (O) Score: ${player1Score}`;
+        player2ScoreSpan.textContent = `Player 2 (X) Score: ${player2Score}`;
+    };
+
+    const updateRound = (round) => {
+        roundSpan.textContent = `Round: ${round}`;
+    };
+
     return {
         updateBoard,
         updateMessage,
         resetBoard,
-        disableBoard
+        disableBoard,
+        updateScores,
+        updateRound
     };
 })();
 
