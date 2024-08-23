@@ -2,42 +2,33 @@
 
 // Game : object constructor
 // attrubutes:
-//  - turn : boolean - true is O and false is X
-//  - round : int
-//  - turn_counter : int
-//  - getPlayerInput() - one of: int[0-8] or getPlayerInput() interp.:
-//    returns a int[0-8] after checking with board for validity
-//  + playTurn() : null - plays one full turn
-//  + gameOVer(hasWinner) : null - announces the winner or tie, updates score, 
-//                        gives prompt for play again.
-//  + newGame() : null - resets board, clears screen and updates visual display of scores.
+//  -turn : boolean - true is O and false is X
+//  -round : int
+//  -turn_counter : int
+//  -getPlayerInput() - one of: int[0-8] or getPlayerInput() interp.:
+//   returns a int[0-8] after checking with board for validity
+//  +playTurn() : null - plays one full turn
+//  +gameOVer(hasWinner) : null - announces the winner or tie, updates score, 
+//                       gives prompt for play again.
+//  +newGame() : null - resets board, clears screen and updates visual display of scores.
 function Game(player1, player2) {
     this.turn = true;
     this.round = 1;
     this.turn_counter = 0;
 
-    this.getPlayerInput = function() {
-        let player_input;
-        do {
-            player_input = parseInt(prompt(`${this.turn ? player1.getName() : player2.getName()}, enter a position (0-8):`));
-        } while (isNaN(player_input) || player_input < 0 || player_input > 8 || !Gameboard.isEmpty(player_input));
-        return player_input;
-    };
-
-    this.playTurn = function() {
-        while (true) {
-            const player_input = this.getPlayerInput();
-            Gameboard.updateBoard(this.turn, player_input);
+    this.playTurn = (index) => {
+        if (Gameboard.isEmpty(index)) {
+            Gameboard.updateBoard(this.turn, index);
+            displayController.updateBoard(index, this.turn ? "O" : "X");
 
             if (Gameboard.checkWin()) {
                 this.gameOver(true);
-                break;
             } else if (this.turn_counter === 8) {
                 this.gameOver(false);
-                break;
             } else {
                 this.turn = !this.turn;
                 this.turn_counter++;
+                displayController.updateMessage(`${this.turn ? player1.getName() : player2.getName()}'s turn`);
             }
         }
     };
@@ -46,11 +37,11 @@ function Game(player1, player2) {
         if (hasWinner) {
             const winner = this.turn ? player1 : player2;
             winner.incrementScore();
-            alert(`${winner.getName()} wins!`);
+            displayController.updateMessage(`${winner.getName()} wins!`);
         } else {
-            alert("It's a tie!");
+            displayController.updateMessage("It's a tie!");
         }
-        this.newGame();
+        displayController.disableBoard();
     };
 
     this.newGame = function() {
@@ -58,26 +49,20 @@ function Game(player1, player2) {
         this.turn = true;
         this.turn_counter = 0;
         this.round++;
-        const playAgain = confirm("Do you want to play again?");
-        if (playAgain) {
-            this.playTurn();
-        } else {
-            alert("Thank you for playing!");
-        }
+        displayController.resetBoard();
+        displayController.updateMessage(`${player1.getName()}'s turn`);
     };
 }
 
 
 
-// Gameboard
-// - IIFE
+// Gameboard : IIFE
 // attributes:
-//  - gameboard : Array of 1 of 3 ("" (empty), "X", "O");
-//  + resetBoard() : null - sets all elements of gameboard to "";
-//  + isEmpty(index:int[0-8]) : boolean - checks wether a given index of gameboard is empty
-//  + updateBoard(turn:bool, player_input:int[0-8]) : null
-//  + checkWin() : boolean
-//  + boardFull() : boolean
+//  -gameboard : Array of 1 of 3 ("" (empty), "X", "O");
+//  +resetBoard() : null - sets all elements of gameboard to "";
+//  +isEmpty(index:int[0-8]) : boolean - checks wether a given index of gameboard is empty
+//  +updateBoard(turn:bool, player_input:int[0-8]) : null
+//  +checkWin() : boolean
 
 const Gameboard = (function() {
     const gameboard = Array(9).fill("");
@@ -96,14 +81,14 @@ const Gameboard = (function() {
 
     const checkWin = () => {
         const winningCombinations = [
-            [0, 1, 2], // Top row
-            [3, 4, 5], // Middle row
-            [6, 7, 8], // Bottom row
-            [0, 3, 6], // Left column
-            [1, 4, 7], // Middle column
-            [2, 5, 8], // Right column
-            [0, 4, 8], // Diagonal from top-left to bottom-right
-            [2, 4, 6]  // Diagonal from top-right to bottom-left
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8],
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8],
+            [0, 4, 8],
+            [2, 4, 6]
         ];
 
         for (let i = 0; i < winningCombinations.length; i++) {
@@ -114,8 +99,8 @@ const Gameboard = (function() {
         }
         return false;
     }
+
     return {
-        gameboard,
         resetBoard,
         isEmpty,
         updateBoard,
@@ -125,10 +110,10 @@ const Gameboard = (function() {
 
 // Player : object constructor
 // attributes:
-//  - name : string
-//  - score : int
-//  + getName() : string
-//  + getScore() : int
+//  -name : string
+//  -score : int
+//  +getName() : string
+//  +getScore() : int
 //  +incrementScore() : null - score++
 function Player(name) {
     this.name = name;
@@ -147,7 +132,65 @@ function Player(name) {
     };
 }
 
-const player1 = new Player("Alice");
-const player2 = new Player("Bob");
+// displayController : IIFE
+// attributes:
+//  -cells : NodeList
+//  -messageDiv : DOM element
+//  -restartButton : DOM element
+//  +updateBoard(index:int[0-8], symbol:string) : null
+//  +updateMessage(message:string) : null
+//  +resetBoard() : null
+//  +disableBoard() : null
+const displayController = (function() {
+    const cells = document.querySelectorAll('.cell');
+    const messageDiv = document.getElementById('message');
+    const restartButton = document.getElementById('restart');
+
+    cells.forEach(cell => {
+        cell.addEventListener('click', (e) => {
+            const index = e.target.getAttribute('data-index');
+            game.playTurn(parseInt(index));
+        });
+    });
+
+    restartButton.addEventListener('click', () => {
+        game.newGame();
+    });
+
+    const updateBoard = (index, symbol) => {
+        const cell = cells[index];
+        cell.textContent = symbol;
+        cell.classList.add('disabled');
+        cell.classList.add(symbol);  // Adds class "X" or "O" for styling
+    }
+
+    const updateMessage = (message) => {
+        messageDiv.textContent = message;
+    }
+
+    const resetBoard = () => {
+        cells.forEach(cell => {
+            cell.textContent = "";
+            cell.className = "cell";  // Resets classes
+        });
+    }
+
+    const disableBoard = () => {
+        cells.forEach(cell => {
+            cell.classList.add('disabled');
+        });
+    }
+
+    return {
+        updateBoard,
+        updateMessage,
+        resetBoard,
+        disableBoard
+    };
+})();
+
+
+const player1 = new Player("Player1 (O)");
+const player2 = new Player("Player2 (X)");
 const game = new Game(player1, player2);
 game.playTurn();
